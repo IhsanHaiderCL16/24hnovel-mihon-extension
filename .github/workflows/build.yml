@@ -7,13 +7,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    env:
-      CI: true
-      SIGNING_KEY: ""
-      SIGNING_KEY_ALIAS: ""
-      SIGNING_KEY_PASSWORD: ""
-      SIGNING_STORE_PASSWORD: ""
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -24,15 +17,11 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - name: Grant execute permission for Gradle
-        run: chmod +x gradlew
-
       - name: Build 24hNovel extension
-        run: |
-          ./gradlew :src:all:twentyfourhnovel:assembleRelease
+        run: ./gradlew :src:all:twentyfourhnovel:assembleRelease
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: twentyfourhnovel-apk
-          path: src/**/twentyfourhnovel/**/*.apk
+          path: src/all/twentyfourhnovel/build/outputs/**/*.apk
