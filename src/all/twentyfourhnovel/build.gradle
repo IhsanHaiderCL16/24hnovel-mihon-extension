@@ -1,10 +1,25 @@
 ext {
     extName = '24hNovel'
-    extClass = '.TwentyFourHNovel'
-    themePkg = 'madara'
+    extClass = 'TwentyFourHNovel'
     baseUrl = 'https://24hnovel.com'
-    overrideVersionCode = 1
-    isNsfw = false
+    language = "en"
 }
 
 apply from: "$rootDir/common.gradle"
+
+android {
+    signingConfigs {
+        release {
+            storeFile null
+            storePassword null
+            keyAlias null
+            keyPassword null
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+        }
+    }
+}
