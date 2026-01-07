@@ -1,5 +1,6 @@
 package eu.kanade.tachiyomi.extension.all.twentyfourhnovel
 
+import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.source.model.FilterList
 import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.model.SChapter
@@ -11,76 +12,108 @@ import org.jsoup.nodes.Element
 
 class TwentyFourHNovel : ParsedHttpSource() {
 
-    override val name = "24hNovel"
-    override val baseUrl = "https://24hnovel.com"
-    override val lang = "en"
-    override val supportsLatest = false
+    override val name = "24HNovel"
 
-    // ============================== Popular ==============================
+    override val baseUrl = "https://24hnovel.com"
+
+    override val lang = "en"
+
+    override val supportsLatest = true
+
+    /* ============================== Popular ============================== */
 
     override fun popularMangaRequest(page: Int): Request {
-        return GET("$baseUrl/manga/page/$page/")
+        return GET("$baseUrl/novel-list/?page=$page")
     }
 
-    override fun popularMangaSelector(): String = "div.page-item-detail"
+    override fun popularMangaSelector(): String {
+        return "div.listupd > div.bs"
+    }
 
     override fun popularMangaFromElement(element: Element): SManga {
         return SManga.create().apply {
-            title = element.select("h3 a").text()
-            url = element.select("h3 a").attr("href")
-            thumbnail_url = element.select("img").attr("src")
+            title = element.selectFirst("a")!!.attr("title")
+            url = element.selectFirst("a")!!.attr("href")
+            thumbnail_url = element.selectFirst("img")?.attr("data-src")
         }
     }
 
-    override fun popularMangaNextPageSelector(): String =
-        "a.next"
-
-    // ============================== Search ==============================
-
-    override fun searchMangaRequest(page: Int, query: String, filters: FilterList): Request {
-        return GET("$baseUrl/?s=$query&post_type=wp-manga")
+    override fun popularMangaNextPageSelector(): String {
+        return "a.next"
     }
 
-    override fun searchMangaSelector(): String = popularMangaSelector()
-    override fun searchMangaFromElement(element: Element): SManga =
-        popularMangaFromElement(element)
+    /* ============================== Latest ============================== */
 
-    override fun searchMangaNextPageSelector(): String? = null
+    override fun latestUpdatesRequest(page: Int): Request {
+        return GET("$baseUrl/latest/?page=$page")
+    }
 
-    // ============================== Manga Details ==============================
+    override fun latestUpdatesSelector(): String {
+        return popularMangaSelector()
+    }
+
+    override fun latestUpdatesFromElement(element: Element): SManga {
+        return popularMangaFromElement(element)
+    }
+
+    override fun latestUpdatesNextPageSelector(): String {
+        return popularMangaNextPageSelector()
+    }
+
+    /* ============================== Search ============================== */
+
+    override fun searchMangaRequest(page: Int, query: String, filters: FilterList): Request {
+        return GET("$baseUrl/?s=$query&page=$page")
+    }
+
+    override fun searchMangaSelector(): String {
+        return popularMangaSelector()
+    }
+
+    override fun searchMangaFromElement(element: Element): SManga {
+        return popularMangaFromElement(element)
+    }
+
+    override fun searchMangaNextPageSelector(): String {
+        return popularMangaNextPageSelector()
+    }
+
+    /* ============================== Details ============================== */
 
     override fun mangaDetailsParse(document: Document): SManga {
         return SManga.create().apply {
-            title = document.selectFirst("h1")?.text() ?: ""
-            description = document.select("div.description-summary").text()
-            genre = document.select("div.genres a").joinToString { it.text() }
+            title = document.selectFirst("h1")!!.text()
+            author = document.select("div.author-content a").joinToString { it.text() }
+            genre = document.select("div.genres-content a").joinToString { it.text() }
+            description = document.selectFirst("div.description-summary")?.text()
+            thumbnail_url = document.selectFirst("div.thumb img")?.attr("src")
             status = SManga.UNKNOWN
         }
     }
 
-    // ============================== Chapters ==============================
+    /* ============================== Chapters ============================== */
 
-    override fun chapterListSelector(): String =
-        "li.wp-manga-chapter"
+    override fun chapterListSelector(): String {
+        return "ul.chapter-list li"
+    }
 
     override fun chapterFromElement(element: Element): SChapter {
         return SChapter.create().apply {
-            name = element.select("a").text()
-            url = element.select("a").attr("href")
+            name = element.selectFirst("a")!!.text()
+            url = element.selectFirst("a")!!.attr("href")
         }
     }
 
-    override fun chapterListParse(response: okhttp3.Response): List<SChapter> {
-        return super.chapterListParse(response).reversed()
-    }
-
-    // ============================== Pages ==============================
+    /* ============================== Pages ============================== */
 
     override fun pageListParse(document: Document): List<Page> {
-        return document.select("div.reading-content img").mapIndexed { index, img ->
-            Page(index, imageUrl = img.attr("src"))
+        val content = document.selectFirst("div.text-left") ?: return emptyList()
+        return content.select("p").mapIndexed { index, _ ->
+            Page(index, "")
         }
     }
 
-    override fun imageUrlParse(document: Document): String = ""
+    override fun imageUrlParse(document: Document): String {
+        throw UnsupportedOperationException("Not used for text sources")
+    }
 }
