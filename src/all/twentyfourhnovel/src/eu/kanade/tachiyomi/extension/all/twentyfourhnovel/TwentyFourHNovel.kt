@@ -1,4 +1,4 @@
-package eu.kanade.tachiyomi.extension.all.twentyfourhnovel
+package eu.kanade.tachiyomi.extension.en.twentyfourhnovel
 
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.source.model.FilterList
