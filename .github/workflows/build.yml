@@ -18,7 +18,7 @@ jobs:
           java-version: 17
 
       - name: Build 24hNovel extension
-        run: ./gradlew :src:all:twentyfourhnovel:assembleRelease
+        run: ./gradlew :src:all:twentyfourhnovel:assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
