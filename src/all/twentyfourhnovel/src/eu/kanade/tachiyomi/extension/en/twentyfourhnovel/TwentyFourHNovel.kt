@@ -19,13 +19,13 @@ class TwentyFourHNovelSource : HttpSource() {
     override val lang = "en"
     override val supportsLatest = false
 
-    override fun popularMangaRequest() =
+    override fun popularMangaRequest(page: Int) =
         throw UnsupportedOperationException()
 
     override fun popularMangaParse(response: Response) =
         throw UnsupportedOperationException()
 
-    override fun latestUpdatesRequest() =
+    override fun latestUpdatesRequest(page: Int) =
         throw UnsupportedOperationException()
 
     override fun latestUpdatesParse(response: Response) =
