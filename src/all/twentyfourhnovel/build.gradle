@@ -1,6 +1,6 @@
 ext {
     extName = '24hNovel'
-    extClass = '.twentyfourhnovel.TwentyFourHNovel'
+    extClass = '.all.twentyfourhnovel.TwentyFourHNovel'
     baseUrl = 'https://24hnovel.com'
     language = 'en'
 
