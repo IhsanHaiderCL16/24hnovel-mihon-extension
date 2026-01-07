@@ -1,10 +1,9 @@
 ext {
     extName = '24hNovel'
-    extClass = 'TwentyFourHNovel'
+    extClass = '.twentyfourhnovel.TwentyFourHNovel'
     baseUrl = 'https://24hnovel.com'
     language = 'en'
 
-    // REQUIRED for local / fork builds
     extVersionCode = 1
     extVersionName = '1.0.0'
 }
