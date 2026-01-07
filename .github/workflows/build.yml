@@ -17,11 +17,11 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - name: Build 24hNovel extension
-        run: ./gradlew :src:all:twentyfourhnovel:assembleDebug
+      - name: Build 24hNovel extension (RELEASE)
+        run: ./gradlew :src:all:twentyfourhnovel:assembleRelease
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: twentyfourhnovel-apk
-          path: src/all/twentyfourhnovel/build/outputs/**/*.apk
+          name: twentyfourhnovel-release-apk
+          path: src/all/twentyfourhnovel/build/outputs/apk/release/*.apk
