@@ -5,7 +5,6 @@ import eu.kanade.tachiyomi.source.model.FilterList
 import eu.kanade.tachiyomi.source.online.HttpSource
 import okhttp3.Request
 import okhttp3.Response
-import org.jsoup.nodes.Document
 import eu.kanade.tachiyomi.network.GET
 
 class TwentyFourHNovel : SourceFactory {
