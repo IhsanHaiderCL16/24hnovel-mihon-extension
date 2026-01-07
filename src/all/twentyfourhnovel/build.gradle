@@ -10,19 +10,14 @@ ext {
 
 apply from: "$rootDir/common.gradle"
 
-android {
-    signingConfigs {
-        release {
-            storeFile null
-            storePassword null
-            keyAlias null
-            keyPassword null
-        }
-    }
+ext {
+    extName = '24hNovel'
+    extClass = '.twentyfourhnovel.TwentyFourHNovel'
+    baseUrl = 'https://24hnovel.com'
+    language = 'en'
 
-    buildTypes {
-        release {
-            signingConfig signingConfigs.release
-        }
-    }
+    extVersionCode = 1
+    extVersionName = '1.0.0'
 }
+
+apply from: "$rootDir/common.gradle"
