@@ -9,15 +9,3 @@ ext {
 }
 
 apply from: "$rootDir/common.gradle"
-
-ext {
-    extName = '24hNovel'
-    extClass = '.twentyfourhnovel.TwentyFourHNovel'
-    baseUrl = 'https://24hnovel.com'
-    language = 'en'
-
-    extVersionCode = 1
-    extVersionName = '1.0.0'
-}
-
-apply from: "$rootDir/common.gradle"
