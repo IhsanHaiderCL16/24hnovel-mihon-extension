@@ -1,4 +1,4 @@
-name: Build Mihon Extension
+name: Build Mihon Extension (Debug)
 
 on:
   workflow_dispatch:
@@ -17,19 +17,11 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - name: Set up Kotlin Linter
-        uses: jmailen/kotlinter-gradle@v3
-        with:
-          gradle-wrapper: ./gradlew
-
-      - name: Run Kotlinter Format
-        run: ./gradlew ktlintFormat
-
-      - name: Build 24hNovel extension (RELEASE)
-        run: ./gradlew :src:all:twentyfourhnovel:assembleRelease
+      - name: Build 24hNovel extension (DEBUG)
+        run: ./gradlew :src:all:twentyfourhnovel:assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: twentyfourhnovel-release-apk
-          path: src/all/twentyfourhnovel/build/outputs/apk/release/*.apk
+          name: twentyfourhnovel-debug-apk
+          path: src/all/twentyfourhnovel/build/outputs/apk/debug/*.apk
