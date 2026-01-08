@@ -17,6 +17,14 @@ jobs:
           distribution: temurin
           java-version: 17
 
+      - name: Set up Kotlin Linter
+        uses: jmailen/kotlinter-gradle@v3
+        with:
+          gradle-wrapper: ./gradlew
+
+      - name: Run Kotlinter Format
+        run: ./gradlew ktlintFormat
+
       - name: Build 24hNovel extension (RELEASE)
         run: ./gradlew :src:all:twentyfourhnovel:assembleRelease
 
