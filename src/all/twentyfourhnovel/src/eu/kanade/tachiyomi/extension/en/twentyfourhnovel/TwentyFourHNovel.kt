@@ -44,7 +44,6 @@ class TwentyFourHNovelSource : HttpSource() {
         val url = if (q.isBlank()) {
             comicsUrl(page)
         } else {
-            // Common WordPress/madara-style manga search
             val encoded = q.urlEncode()
             "$baseUrl/?s=$encoded&post_type=wp-manga&paged=$page"
         }
@@ -61,13 +60,13 @@ class TwentyFourHNovelSource : HttpSource() {
         val title = document.selectFirst("h1")?.text()?.trim().orEmpty()
 
         val thumb = document.selectFirst(
-            "div.summary_image img, img.wp-post-image, .summary_image img, .profile-manga img"
+            "div.summary_image img, img.wp-post-image, .summary_image img, .profile-manga img",
         )?.let { img ->
             img.absUrl("data-src").ifBlank { img.absUrl("src") }
         }?.ifBlank { null }
 
         val description = document.selectFirst(
-            "div.summary__content, div.description-summary, .summary__content, .description-summary"
+            "div.summary__content, div.description-summary, .summary__content, .description-summary",
         )?.text()?.trim()
 
         return SManga.create().apply {
@@ -81,7 +80,6 @@ class TwentyFourHNovelSource : HttpSource() {
     override fun chapterListParse(response: Response): List<SChapter> {
         val document = response.asJsoup()
 
-        // Madara often uses li.wp-manga-chapter a
         val chapterAnchors = document.select("li.wp-manga-chapter a")
             .ifEmpty { document.select("a[href*='/chapter-']") }
 
@@ -107,7 +105,7 @@ class TwentyFourHNovelSource : HttpSource() {
         val document = response.asJsoup()
 
         val images = document.select(
-            "div.reading-content img, .reading-content img, .page-break img, img.wp-manga-chapter-img"
+            "div.reading-content img, .reading-content img, .page-break img, img.wp-manga-chapter-img",
         ).ifEmpty {
             document.select("img")
         }
@@ -120,9 +118,12 @@ class TwentyFourHNovelSource : HttpSource() {
 
             if (url.isBlank()) return@mapNotNull null
 
-            // Filter obvious junk/icons
-            val lower = url.lowercase()
-            if (!(lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".png") || lower.endsWith(".webp"))) {
+            val check = url.lowercase().substringBefore("?")
+            if (!(check.endsWith(".jpg") ||
+                    check.endsWith(".jpeg") ||
+                    check.endsWith(".png") ||
+                    check.endsWith(".webp"))
+            ) {
                 return@mapNotNull null
             }
 
@@ -160,11 +161,11 @@ class TwentyFourHNovelSource : HttpSource() {
                 if (!href.contains("/manga/")) return@mapNotNull null
                 if (href.contains("/chapter-")) return@mapNotNull null
 
-                // We only want real manga detail pages like /manga/some-slug/
-                val after = href.substringAfter("/manga/", "")
+                // Allow trailing slash but reject extra path segments.
+                val after = href.substringAfter("/manga/", "").trimEnd('/')
                 if (after.isBlank() || after.contains("/")) return@mapNotNull null
 
-                val title = a.text().trim()
+                val title = a.text().trim().ifBlank { a.attr("title").trim() }
                 if (title.isBlank()) return@mapNotNull null
 
                 SManga.create().apply {
@@ -174,7 +175,8 @@ class TwentyFourHNovelSource : HttpSource() {
             }
             .distinctBy { it.url }
 
-        val hasNextPage = document.select("a:contains(Older Posts), a.next, a.next.page-numbers").isNotEmpty()
+        val hasNextPage = document.select("a:contains(Older Posts), a.next, a.next.page-numbers")
+            .isNotEmpty()
 
         return MangasPage(mangaLinks, hasNextPage)
     }
