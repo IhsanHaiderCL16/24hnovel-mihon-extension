@@ -24,21 +24,18 @@ class TwentyFourHNovelSource : HttpSource() {
     override val lang = "en"
     override val supportsLatest = true
 
-    // --- Popular (we use the site's COMICS tag page) ---
     override fun popularMangaRequest(page: Int): Request =
         GET(comicsUrl(page), headers)
 
     override fun popularMangaParse(response: Response): MangasPage =
         comicsParse(response)
 
-    // --- Latest (same page, but order by "Latest") ---
     override fun latestUpdatesRequest(page: Int): Request =
         GET(comicsUrl(page, orderBy = "latest"), headers)
 
     override fun latestUpdatesParse(response: Response): MangasPage =
         comicsParse(response)
 
-    // --- Search ---
     override fun searchMangaRequest(page: Int, query: String, filters: FilterList): Request {
         val q = query.trim()
         val url = if (q.isBlank()) {
@@ -53,7 +50,6 @@ class TwentyFourHNovelSource : HttpSource() {
     override fun searchMangaParse(response: Response): MangasPage =
         comicsParse(response)
 
-    // --- Details ---
     override fun mangaDetailsParse(response: Response): SManga {
         val document = response.asJsoup()
 
@@ -76,7 +72,6 @@ class TwentyFourHNovelSource : HttpSource() {
         }
     }
 
-    // --- Chapters ---
     override fun chapterListParse(response: Response): List<SChapter> {
         val document = response.asJsoup()
 
@@ -96,11 +91,9 @@ class TwentyFourHNovelSource : HttpSource() {
             }
         }
 
-        // Many sites list newest first; Mihon prefers oldest first
         return chapters.reversed()
     }
 
-    // --- Pages (images) ---
     override fun pageListParse(response: Response): List<Page> {
         val document = response.asJsoup()
 
@@ -109,6 +102,8 @@ class TwentyFourHNovelSource : HttpSource() {
         ).ifEmpty {
             document.select("img")
         }
+
+        val allowedExts = listOf(".jpg", ".jpeg", ".png", ".webp")
 
         val urls = images.mapNotNull { img ->
             val url = img.absUrl("data-src")
@@ -119,13 +114,8 @@ class TwentyFourHNovelSource : HttpSource() {
             if (url.isBlank()) return@mapNotNull null
 
             val check = url.lowercase().substringBefore("?")
-            if (!(check.endsWith(".jpg") ||
-                    check.endsWith(".jpeg") ||
-                    check.endsWith(".png") ||
-                    check.endsWith(".webp"))
-            ) {
-                return@mapNotNull null
-            }
+            val isAllowed = allowedExts.any { ext -> check.endsWith(ext) }
+            if (!isAllowed) return@mapNotNull null
 
             url
         }.distinct()
@@ -137,8 +127,6 @@ class TwentyFourHNovelSource : HttpSource() {
 
     override fun imageUrlParse(response: Response): String =
         throw UnsupportedOperationException("Not used (we return Page image URLs directly).")
-
-    // ---------------- Helpers ----------------
 
     private fun comicsUrl(page: Int, orderBy: String? = null): String {
         val path = buildString {
@@ -161,7 +149,6 @@ class TwentyFourHNovelSource : HttpSource() {
                 if (!href.contains("/manga/")) return@mapNotNull null
                 if (href.contains("/chapter-")) return@mapNotNull null
 
-                // Allow trailing slash but reject extra path segments.
                 val after = href.substringAfter("/manga/", "").trimEnd('/')
                 if (after.isBlank() || after.contains("/")) return@mapNotNull null
 
@@ -175,8 +162,9 @@ class TwentyFourHNovelSource : HttpSource() {
             }
             .distinctBy { it.url }
 
-        val hasNextPage = document.select("a:contains(Older Posts), a.next, a.next.page-numbers")
-            .isNotEmpty()
+        val hasNextPage = document.select(
+            "a:contains(Older Posts), a.next, a.next.page-numbers",
+        ).isNotEmpty()
 
         return MangasPage(mangaLinks, hasNextPage)
     }
