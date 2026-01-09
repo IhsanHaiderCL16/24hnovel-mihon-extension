@@ -3,12 +3,14 @@ package eu.kanade.tachiyomi.extension.en.twentyfourhnovel
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.source.model.Filter
 import eu.kanade.tachiyomi.source.model.FilterList
+import eu.kanade.tachiyomi.source.model.MangasPage
 import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.online.ParsedHttpSource
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Request
+import okhttp3.Response
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import java.text.SimpleDateFormat
@@ -23,7 +25,12 @@ class TwentyFourHNovel : ParsedHttpSource() {
 
     // Popular Manga
     override fun popularMangaRequest(page: Int): Request {
-        return GET("$baseUrl/manga-tag/comic/page/$page/?m_orderby=views", headers)
+        val url = if (page == 1) {
+            "$baseUrl/manga-tag/comic/?m_orderby=views"
+        } else {
+            "$baseUrl/manga-tag/comic/page/$page/?m_orderby=views"
+        }
+        return GET(url, headers)
     }
 
     override fun popularMangaSelector() = "div.page-item-detail"
@@ -44,20 +51,47 @@ class TwentyFourHNovel : ParsedHttpSource() {
         }
     }
 
-    override fun popularMangaNextPageSelector() = "a.next.page-numbers"
+    override fun popularMangaNextPageSelector() = "a.next.page-numbers, div.nav-previous a"
+
+    override fun popularMangaParse(response: Response): MangasPage {
+        val document = response.asJsoup()
+        val mangas = document.select(popularMangaSelector()).map { element ->
+            popularMangaFromElement(element)
+        }
+        val hasNextPage = document.select(popularMangaNextPageSelector()).isNotEmpty()
+        return MangasPage(mangas, hasNextPage)
+    }
 
     // Latest Manga
     override fun latestUpdatesRequest(page: Int): Request {
-        return GET("$baseUrl/manga-tag/comic/page/$page/?m_orderby=latest", headers)
+        val url = if (page == 1) {
+            "$baseUrl/manga-tag/comic/?m_orderby=latest"
+        } else {
+            "$baseUrl/manga-tag/comic/page/$page/?m_orderby=latest"
+        }
+        return GET(url, headers)
     }
 
     override fun latestUpdatesSelector() = popularMangaSelector()
     override fun latestUpdatesFromElement(element: Element) = popularMangaFromElement(element)
     override fun latestUpdatesNextPageSelector() = popularMangaNextPageSelector()
 
+    override fun latestUpdatesParse(response: Response): MangasPage {
+        val document = response.asJsoup()
+        val mangas = document.select(latestUpdatesSelector()).map { element ->
+            latestUpdatesFromElement(element)
+        }
+        val hasNextPage = document.select(latestUpdatesNextPageSelector()).isNotEmpty()
+        return MangasPage(mangas, hasNextPage)
+    }
+
     // Search Manga
     override fun searchMangaRequest(page: Int, query: String, filters: FilterList): Request {
-        val url = "$baseUrl/manga-tag/comic/page/$page/".toHttpUrl().newBuilder()
+        val url = if (page == 1) {
+            "$baseUrl/manga-tag/comic/".toHttpUrl().newBuilder()
+        } else {
+            "$baseUrl/manga-tag/comic/page/$page/".toHttpUrl().newBuilder()
+        }
 
         if (query.isNotBlank()) {
             url.addQueryParameter("s", query)
@@ -91,6 +125,15 @@ class TwentyFourHNovel : ParsedHttpSource() {
     override fun searchMangaSelector() = popularMangaSelector()
     override fun searchMangaFromElement(element: Element) = popularMangaFromElement(element)
     override fun searchMangaNextPageSelector() = popularMangaNextPageSelector()
+
+    override fun searchMangaParse(response: Response): MangasPage {
+        val document = response.asJsoup()
+        val mangas = document.select(searchMangaSelector()).map { element ->
+            searchMangaFromElement(element)
+        }
+        val hasNextPage = document.select(searchMangaNextPageSelector()).isNotEmpty()
+        return MangasPage(mangas, hasNextPage)
+    }
 
     // Manga Details
     override fun mangaDetailsParse(document: Document): SManga {
