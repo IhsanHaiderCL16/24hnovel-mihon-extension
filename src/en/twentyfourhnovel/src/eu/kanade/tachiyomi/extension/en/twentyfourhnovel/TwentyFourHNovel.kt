@@ -95,13 +95,13 @@ class TwentyFourHNovel : ParsedHttpSource() {
             } else {
                 "$baseUrl/page/$page/".toHttpUrl().newBuilder()
             }
-            
+
             url.addQueryParameter("s", query)
             url.addQueryParameter("post_type", "wp-manga")
-            
+
             return GET(url.toString(), headers)
         }
-        
+
         // Otherwise use the comic tag page with filters
         val url = if (page == 1) {
             "$baseUrl/manga-tag/comic/".toHttpUrl().newBuilder()
@@ -139,13 +139,13 @@ class TwentyFourHNovel : ParsedHttpSource() {
         return SManga.create().apply {
             // Try multiple selectors for different page layouts
             val link = element.select("h3 a, h5 a, div.post-title a, .tab-thumb a").first()
-            
+
             link?.let { a ->
                 val href = a.attr("href")
                 setUrlWithoutDomain(href)
                 title = a.attr("title").ifBlank { a.text().trim() }
             }
-            
+
             thumbnail_url = element.select("img").first()?.let { img ->
                 img.attr("data-src").ifBlank {
                     img.attr("data-lazy-src").ifBlank {
