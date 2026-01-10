@@ -88,15 +88,25 @@ class TwentyFourHNovel : ParsedHttpSource() {
 
     // Search Manga
     override fun searchMangaRequest(page: Int, query: String, filters: FilterList): Request {
+        // If there's a text query, use the search endpoint
+        if (query.isNotBlank()) {
+            val url = if (page == 1) {
+                "$baseUrl/".toHttpUrl().newBuilder()
+            } else {
+                "$baseUrl/page/$page/".toHttpUrl().newBuilder()
+            }
+            
+            url.addQueryParameter("s", query)
+            url.addQueryParameter("post_type", "wp-manga")
+            
+            return GET(url.toString(), headers)
+        }
+        
+        // Otherwise use the comic tag page with filters
         val url = if (page == 1) {
             "$baseUrl/manga-tag/comic/".toHttpUrl().newBuilder()
         } else {
             "$baseUrl/manga-tag/comic/page/$page/".toHttpUrl().newBuilder()
-        }
-
-        if (query.isNotBlank()) {
-            url.addQueryParameter("s", query)
-            url.addQueryParameter("post_type", "wp-manga")
         }
 
         filters.forEach { filter ->
@@ -123,14 +133,45 @@ class TwentyFourHNovel : ParsedHttpSource() {
         return GET(url.toString(), headers)
     }
 
-    override fun searchMangaSelector() = popularMangaSelector()
-    override fun searchMangaFromElement(element: Element) = popularMangaFromElement(element)
+    override fun searchMangaSelector() = "div.page-item-detail, div.c-tabs-item__content"
+
+    override fun searchMangaFromElement(element: Element): SManga {
+        return SManga.create().apply {
+            // Try multiple selectors for different page layouts
+            val link = element.select("h3 a, h5 a, div.post-title a, .tab-thumb a").first()
+            
+            link?.let { a ->
+                val href = a.attr("href")
+                setUrlWithoutDomain(href)
+                title = a.attr("title").ifBlank { a.text().trim() }
+            }
+            
+            thumbnail_url = element.select("img").first()?.let { img ->
+                img.attr("data-src").ifBlank {
+                    img.attr("data-lazy-src").ifBlank {
+                        img.attr("src")
+                    }
+                }
+            }
+        }
+    }
+
     override fun searchMangaNextPageSelector() = popularMangaNextPageSelector()
 
     override fun searchMangaParse(response: Response): MangasPage {
         val document = response.asJsoup()
-        val mangas = document.select(searchMangaSelector()).map { element ->
-            searchMangaFromElement(element)
+        val mangas = document.select(searchMangaSelector()).mapNotNull { element ->
+            try {
+                val manga = searchMangaFromElement(element)
+                // Filter to only include manga URLs, not chapters or other pages
+                if (manga.url.contains("/manga/") && !manga.url.contains("/chapter-")) {
+                    manga
+                } else {
+                    null
+                }
+            } catch (e: Exception) {
+                null
+            }
         }
         val hasNextPage = document.select(searchMangaNextPageSelector()).isNotEmpty()
         return MangasPage(mangas, hasNextPage)
@@ -212,7 +253,7 @@ class TwentyFourHNovel : ParsedHttpSource() {
 
     // Filters
     override fun getFilterList() = FilterList(
-        Filter.Header("NOTE: Ignored if using text search!"),
+        Filter.Header("NOTE: Filters ignored when using text search!"),
         Filter.Separator(),
         OrderByFilter(),
         StatusFilter(),
