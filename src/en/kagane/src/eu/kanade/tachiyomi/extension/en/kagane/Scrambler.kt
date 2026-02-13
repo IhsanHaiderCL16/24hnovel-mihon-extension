@@ -3,7 +3,6 @@ package eu.kanade.tachiyomi.extension.en.kagane
 import java.math.BigInteger
 
 class Scrambler(private val seed: BigInteger, private val gridSize: Int) {
-
     private val totalPieces: Int = gridSize * gridSize
     private val randomizer: Randomizer = Randomizer(seed, gridSize)
     private val dependencyGraph: DependencyGraph
@@ -16,7 +15,7 @@ class Scrambler(private val seed: BigInteger, private val gridSize: Int) {
 
     private data class DependencyGraph(
         val graph: MutableMap<Int, MutableList<Int>>,
-        val inDegree: MutableMap<Int, Int>,
+        val inDegree: MutableMap<Int, Int>
     )
 
     private fun buildDependencyGraph(): DependencyGraph {
@@ -29,12 +28,11 @@ class Scrambler(private val seed: BigInteger, private val gridSize: Int) {
         }
 
         val rng = Randomizer(seed, gridSize)
-
         for (r in 0 until totalPieces) {
             val i = (rng.prng() % BigInteger.valueOf(3) + BigInteger.valueOf(2)).toInt()
             repeat(i) {
                 val j = (rng.prng() % BigInteger.valueOf(totalPieces.toLong())).toInt()
-                if (j != r && !wouldCreateCycle(graph, j, r)) {
+                if (j != r && !graph[j]!!.contains(r) && !wouldCreateCycle(graph, j, r)) {
                     graph[j]!!.add(r)
                     inDegree[r] = inDegree[r]!! + 1
                 }
@@ -46,7 +44,7 @@ class Scrambler(private val seed: BigInteger, private val gridSize: Int) {
                 var tries = 0
                 while (tries < 10) {
                     val s = (rng.prng() % BigInteger.valueOf(totalPieces.toLong())).toInt()
-                    if (s != r && !wouldCreateCycle(graph, s, r)) {
+                    if (s != r && !graph[s]!!.contains(r) && !wouldCreateCycle(graph, s, r)) {
                         graph[s]!!.add(r)
                         inDegree[r] = inDegree[r]!! + 1
                         break
@@ -76,12 +74,10 @@ class Scrambler(private val seed: BigInteger, private val gridSize: Int) {
     private fun generateScramblePath(): List<Int> {
         val graphCopy = dependencyGraph.graph.mapValues { it.value.toMutableList() }.toMutableMap()
         val inDegreeCopy = dependencyGraph.inDegree.toMutableMap()
-
         val queue = ArrayDeque<Int>()
+
         for (n in 0 until totalPieces) {
-            if (inDegreeCopy[n] == 0) {
-                queue.add(n)
-            }
+            if (inDegreeCopy[n] == 0) queue.add(n)
         }
 
         val order = mutableListOf<Int>()
@@ -92,34 +88,23 @@ class Scrambler(private val seed: BigInteger, private val gridSize: Int) {
             if (neighbors != null) {
                 for (e in neighbors) {
                     inDegreeCopy[e] = inDegreeCopy[e]!! - 1
-                    if (inDegreeCopy[e] == 0) {
-                        queue.add(e)
-                    }
+                    if (inDegreeCopy[e] == 0) queue.add(e)
                 }
             }
         }
+
         return order
     }
 
     fun getScrambleMapping(): List<Pair<Int, Int>> {
-        var e = randomizer.order.toMutableList()
-
+        val e = randomizer.order.toMutableList()
         if (scramblePath.size == totalPieces) {
-            val t = Array(totalPieces) { 0 }
-            for (i in scramblePath.indices) {
-                t[i] = scramblePath[i]
-            }
             val n = Array(totalPieces) { 0 }
-            for (r in 0 until totalPieces) {
-                n[r] = e[t[r]]
+            for (r in scramblePath.indices) {
+                n[scramblePath[r]] = e[r]
             }
-            e = n.toMutableList()
+            return (0 until totalPieces).map { it to n[it] }
         }
-
-        val result = mutableListOf<Pair<Int, Int>>()
-        for (n in 0 until totalPieces) {
-            result.add(n to e[n])
-        }
-        return result
+        return (0 until totalPieces).map { it to e[it] }
     }
 }

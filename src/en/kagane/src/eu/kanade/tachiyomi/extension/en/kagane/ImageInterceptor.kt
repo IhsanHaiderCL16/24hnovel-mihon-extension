@@ -4,7 +4,7 @@ import okhttp3.Interceptor
 import okhttp3.Protocol
 import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
-import okio.IOException
+import java.io.IOException
 import java.math.BigInteger
 import javax.crypto.Cipher
 import javax.crypto.SecretKey
@@ -33,9 +33,7 @@ open class ImageInterceptor : Interceptor {
                 .code(200)
                 .message("")
                 .build()
-        } else {
-            chain.proceed(chain.request())
-        }
+        } else chain.proceed(chain.request())
     }
 
     data class WordArray(val words: IntArray, val sigBytes: Int)
@@ -50,8 +48,9 @@ open class ImageInterceptor : Interceptor {
         return result
     }
 
-    private fun aesGcmDecrypt(keyWordArray: WordArray, ivWordArray: WordArray, cipherWordArray: WordArray): ByteArray? {
-        return try {
+    // GCM auth tag length is 128-bit (standard). IV is expected to be 12 bytes.
+    private fun aesGcmDecrypt(keyWordArray: WordArray, ivWordArray: WordArray, cipherWordArray: WordArray): ByteArray? =
+        try {
             val keyBytes = wordArrayToBytes(keyWordArray)
             val iv = wordArrayToBytes(ivWordArray)
             val cipherBytes = wordArrayToBytes(cipherWordArray)
@@ -65,7 +64,6 @@ open class ImageInterceptor : Interceptor {
         } catch (_: Exception) {
             null
         }
-    }
 
     private fun toWordArray(bytes: ByteArray): WordArray {
         val words = IntArray((bytes.size + 3) / 4)
@@ -77,101 +75,49 @@ open class ImageInterceptor : Interceptor {
         return WordArray(words, bytes.size)
     }
 
+    // Payload layout: [0..127] = header (128 bytes), [128..139] = IV (12 bytes), [140..] = ciphertext
     private fun decryptImage(payload: ByteArray, keyPart1: String, keyPart2: String): ByteArray? {
-        return try {
-            if (payload.size < 140) return null
-
-            val iv = payload.sliceArray(128 until 140)
-            val ciphertext = payload.sliceArray(140 until payload.size)
-
-            val keyHash = "$keyPart1:$keyPart2".sha256()
-
-            val keyWA = toWordArray(keyHash)
-            val ivWA = toWordArray(iv)
-            val cipherWA = toWordArray(ciphertext)
-
-            aesGcmDecrypt(keyWA, ivWA, cipherWA)
-        } catch (_: Exception) {
-            null
-        }
+        if (payload.size < PAYLOAD_MIN_SIZE) return null
+        val iv = payload.sliceArray(HEADER_SIZE until IV_END)
+        val ciphertext = payload.sliceArray(IV_END until payload.size)
+        val keyHash = "$keyPart1:$keyPart2".sha256()
+        return aesGcmDecrypt(toWordArray(keyHash), toWordArray(iv), toWordArray(ciphertext))
     }
 
     private fun processData(input: ByteArray, index: Int, seriesId: String, chapterId: String): ByteArray? {
         fun isValidImage(data: ByteArray): Boolean {
             return when {
-                // JPEG
                 data.size >= 2 && data[0] == 0xFF.toByte() && data[1] == 0xD8.toByte() -> true
-                // GIF
-                data.size >= 6 && (
-                    data.copyOfRange(0, 6).contentEquals("GIF87a".encodeToByteArray()) ||
-                        data.copyOfRange(0, 6).contentEquals("GIF89a".encodeToByteArray())
-                    ) -> true
-                // PNG
-                data.size >= 8 && data.copyOfRange(0, 8).contentEquals(
-                    byteArrayOf(
-                        0x89.toByte(),
-                        'P'.code.toByte(),
-                        'N'.code.toByte(),
-                        'G'.code.toByte(),
-                        0x0D,
-                        0x0A,
-                        0x1A,
-                        0x0A,
-                    ),
-                ) -> true
-                // WEBP
-                data.size >= 12 && data[0] == 'R'.code.toByte() && data[1] == 'I'.code.toByte() &&
-                    data[2] == 'F'.code.toByte() && data[3] == 'F'.code.toByte() &&
-                    data[8] == 'W'.code.toByte() && data[9] == 'E'.code.toByte() &&
-                    data[10] == 'B'.code.toByte() && data[11] == 'P'.code.toByte() -> true
-                // HEIF
-                data.size >= 12 && data.copyOfRange(4, 8).contentEquals("ftyp".encodeToByteArray()) -> {
-                    val type = data.copyOfRange(8, 11)
-                    type.contentEquals("hei".encodeToByteArray()) ||
-                        type.contentEquals("hev".encodeToByteArray()) ||
-                        type.contentEquals("avi".encodeToByteArray())
-                }
-                // JXL
-                data.size >= 2 && data[0] == 0xFF.toByte() && data[1] == 0x0A.toByte() -> true
-                data.size >= 12 && data.copyOfRange(0, 8).contentEquals(
-                    byteArrayOf(
-                        0,
-                        0,
-                        0,
-                        12,
-                        'J'.code.toByte(),
-                        'X'.code.toByte(),
-                        'L'.code.toByte(),
-                        ' '.code.toByte(),
-                    ),
-                ) -> true
+                data.size >= 6 && (data.copyOfRange(0, 6).contentEquals("GIF87a".encodeToByteArray()) ||
+                        data.copyOfRange(0, 6).contentEquals("GIF89a".encodeToByteArray())) -> true
+                data.size >= 8 && data.copyOfRange(0, 8).contentEquals(byteArrayOf(
+                    0x89.toByte(), 'P'.code.toByte(), 'N'.code.toByte(), 'G'.code.toByte(),
+                    0x0D, 0x0A, 0x1A, 0x0A)) -> true
                 else -> false
             }
         }
 
-        try {
+        return try {
             var processed: ByteArray = input
-
             if (!isValidImage(processed)) {
-                val seed = generateSeed(seriesId, chapterId, "%04d.jpg".format(index))
+                // Page filenames are 1-based (e.g. 0001.jpg for page index 0)
+                val seed = generateSeed(seriesId, chapterId, "%04d.jpg".format(index + 1))
                 val scrambler = Scrambler(seed, 10)
                 val scrambleMapping = scrambler.getScrambleMapping()
                 processed = unscramble(processed, scrambleMapping, true)
                 if (!isValidImage(processed)) return null
             }
-
-            return processed
+            processed
         } catch (_: Exception) {
-            return null
+            null
         }
     }
 
+    // Uses first SEED_BYTES bytes of SHA-256 hash to build a 64-bit unsigned seed
     private fun generateSeed(t: String, n: String, e: String): BigInteger {
         val sha256 = "$t:$n:$e".sha256()
         var a = BigInteger.ZERO
-        for (i in 0 until 8) {
-            a = a.shiftLeft(8).or(BigInteger.valueOf((sha256[i].toInt() and 0xFF).toLong()))
-        }
+        for (i in 0 until SEED_BYTES) a = a.shiftLeft(8).or(BigInteger.valueOf((sha256[i].toInt() and 0xFF).toLong()))
         return a
     }
 
@@ -181,18 +127,12 @@ open class ImageInterceptor : Interceptor {
         val l = a / s
         val o = a % s
 
+        // When n=true  remainder is a prefix of data; chunks follow it.
+        // When n=false remainder is a suffix of data; chunks precede it.
         val (r, i) = if (n) {
-            if (o > 0) {
-                Pair(data.copyOfRange(0, o), data.copyOfRange(o, a))
-            } else {
-                Pair(ByteArray(0), data)
-            }
+            if (o > 0) Pair(data.copyOfRange(0, o), data.copyOfRange(o, a)) else Pair(ByteArray(0), data)
         } else {
-            if (o > 0) {
-                Pair(data.copyOfRange(a - o, a), data.copyOfRange(0, a - o))
-            } else {
-                Pair(ByteArray(0), data)
-            }
+            if (o > 0) Pair(data.copyOfRange(a - o, a), data.copyOfRange(0, a - o)) else Pair(ByteArray(0), data)
         }
 
         val chunks = (0 until s).map { idx ->
@@ -202,27 +142,24 @@ open class ImageInterceptor : Interceptor {
         }.toMutableList()
 
         val u = Array(s) { ByteArray(0) }
-
         if (n) {
-            for ((e, m) in mapping) {
-                if (e < s && m < s) {
-                    u[e] = chunks[m]
-                }
-            }
+            for ((e, m) in mapping) if (e < s && m < s) u[e] = chunks[m]
         } else {
-            for ((e, m) in mapping) {
-                if (e < s && m < s) {
-                    u[m] = chunks[e]
-                }
-            }
+            for ((e, m) in mapping) if (e < s && m < s) u[m] = chunks[e]
         }
 
         val h = u.fold(ByteArray(0)) { acc, chunk -> acc + chunk }
+        // Remainder always stays on the side it was taken from:
+        // n=true  → remainder was a prefix → restore as suffix after reassembled chunks
+        // n=false → remainder was a suffix → restore as suffix after reassembled chunks
+        return h + r
+    }
 
-        return if (n) {
-            h + r
-        } else {
-            r + h
-        }
+    companion object {
+        private const val HEADER_SIZE = 128
+        private const val IV_SIZE = 12
+        private const val IV_END = HEADER_SIZE + IV_SIZE       // 140
+        private const val PAYLOAD_MIN_SIZE = IV_END            // must have at least header + IV
+        private const val SEED_BYTES = 8                       // first 8 bytes of SHA-256 → 64-bit seed
     }
 }
