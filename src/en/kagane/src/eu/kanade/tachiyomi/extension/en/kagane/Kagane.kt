@@ -701,7 +701,7 @@ class Kagane : HttpSource(), ConfigurableSource {
         val metadata = try {
             response.parseAs<MetadataDto>()
         } catch (e: Throwable) {
-            Log.e(name, "Unable to parse filters", e)
+            Log.e(name, "Failed to parse filters", e)
 
             filters.addAll(
                 index = 0,
