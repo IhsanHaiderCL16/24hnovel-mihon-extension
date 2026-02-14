@@ -17,7 +17,6 @@ import androidx.preference.ListPreference
 import androidx.preference.MultiSelectListPreference
 import androidx.preference.PreferenceScreen
 import androidx.preference.SwitchPreferenceCompat
-import eu.kanade.tachiyomi.extension.en.kagane.ChapterDto.Companion.dateFormat
 import eu.kanade.tachiyomi.extension.en.kagane.wv.Cdm
 import eu.kanade.tachiyomi.extension.en.kagane.wv.ProtectionSystemHeaderBox
 import eu.kanade.tachiyomi.extension.en.kagane.wv.parsePssh
@@ -58,6 +57,8 @@ import uy.kohesive.injekt.api.get
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.charset.StandardCharsets
+import java.text.SimpleDateFormat
+import java.util.Locale
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
@@ -74,6 +75,9 @@ class Kagane : HttpSource(), ConfigurableSource {
     override val supportsLatest = true
 
     private val preferences by getPreferencesLazy()
+
+    // Fix for build error: define dateFormat locally
+    private val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
 
     override val client = network.cloudflareClient.newBuilder()
         .addInterceptor(ImageInterceptor())
@@ -204,9 +208,10 @@ class Kagane : HttpSource(), ConfigurableSource {
         val dto = response.parseAs<SearchDto>()
         val mangas = dto.content.filter {
             if (!preferences.showDuplicates) {
-                val alternateSeries = client.newCall(GET("$apiUrl/api/v1/alternate_series/${it.id}", apiHeaders))
-                    .execute()
-                    .parseAs<List<AlternateSeries>>()
+                val alternateSeries =
+                    client.newCall(GET("$apiUrl/api/v1/alternate_series/${it.id}", apiHeaders))
+                        .execute()
+                        .parseAs<List<AlternateSeries>>()
 
                 if (alternateSeries.isEmpty()) return@filter true
 
@@ -407,21 +412,21 @@ class Kagane : HttpSource(), ConfigurableSource {
                         }
                         let n = e.createSession();
                         let i = new Promise((resolve, reject) => {
-                          function onMessage(event) {
-                            n.removeEventListener("message", onMessage);
-                            if (video) {
-                                document.body.removeChild(video)
-                            }
-                            resolve(event.message);
-                          }
+                         function onMessage(event) {
+                           n.removeEventListener("message", onMessage);
+                           if (video) {
+                               document.body.removeChild(video)
+                           }
+                           resolve(event.message);
+                         }
 
-                          function onError() {
-                            n.removeEventListener("error", onError);
-                            reject(new Error("Failed to generate license challenge"));
-                          }
+                         function onError() {
+                           n.removeEventListener("error", onError);
+                           reject(new Error("Failed to generate license challenge"));
+                         }
 
-                          n.addEventListener("message", onMessage);
-                          n.addEventListener("error", onError);
+                         n.addEventListener("message", onMessage);
+                         n.addEventListener("error", onError);
                         });
 
                         if (widevine) {
